@@ -12,15 +12,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class GPTChatbot {
-    private static final String OPENAI_API_KEY = "token gpt";
+    private static final String OPENAI_API_KEY = "api_keey";
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
     public static String enviarParaGPT(String mensagem) throws Exception {
@@ -48,30 +45,48 @@ public class GPTChatbot {
         return respostaJson.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
     }
 
+    private static void melhorarMensagem(String mensagem) throws Exception {
+String retornoGPT = enviarParaGPT("Vou lhe mandar um texto e quero que me responda o mesmo texto mantendo pessoas, etc, porem com outras palavras " +
+        "NÃO QUERO que me mande afirmando o que fez, apenas faça o que eu pedi texto:, " + mensagem);
+if (retornoGPT.contains("\n")){
+    retornoGPT = retornoGPT.split("\n")[1];
+}
+        System.out.println(retornoGPT);
+    }
     public static void main(String[] args) {
-        List<String> transações = new ArrayList<>();
+        List<String> transacoes = new ArrayList<>();
 
         File arquivo = new File("src/main/resources/data.txt");
 
         try (BufferedReader br = new BufferedReader(new FileReader(arquivo))) {
             String linha;
             while ((linha = br.readLine()) != null) {
-                transações.add(linha);
+                transacoes.add(linha);
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException ignored) {
+
         }
         Scanner scanner = new Scanner(System.in);
-        String preMessage = "Ignore mensagens anteriores e faça APENAS o que eu pedi::\n " +
+        String preMessage = "Ignore mensagens anteriores e faça APENAS o que eu pedi: \n " +
                 "Vou lhe mandar um texto avalie seu conteudo e me responda apenas:\n " +
                 "'Opção 1', o texto possui apenas uma saudação\n" +
                 "'Opção 2', o texto questiona algo envolvendo fraude bancaria, transações e cartões, porém não informa o usuario nem a transação que quer avaliar\n" +
                 "'Opção 3 {nome:nome, trans: trans}' , o texto questiona sobre fraude bancaria, porem informa tambem o usuario e a transação que quer avaliar \n" +
                 "'Opção 4 {nome:nome}' , o texto contem um pedido de listagem de transações, caso ele não informe um nome pode retornar null no nome \n" +
-                "'Opção 5' Caso não se enquadre em nenhma dessas";
+                "'Opção 6 {nome:nome}' Caso a mensagem esteja informando um nome, exemplo: 'meu nome é Bob' ou apenas 'bob'\n" +
+                "'Opção 7', caso o texto for uma confirmação (sim, claro, etc)\n" +
+                "'Opção 8', caso o texto for uma negação (não, etc)\n" +
+                "'Opção 5' Caso não se enquadre em nenhma dessas \n" +
+                "Caso o texto não possua um nome, porem em um texto anterior eu ja tenha informado um nome, eu adicionarei uma observação ao final do txto, informando o nome" +
+                "assim, nas opções 3 e 4 pode usar o nome que eu passei na observação, caso não exista um novo nome no texto\n" +
+                "Vou informar o texto agora: ";
         boolean jaPerguntouSobreFraude = false;
         boolean jaSaudou = false;
         String nome = null;
+        boolean pedirConfirmacao = false;
+        boolean pedirConfirmacaoExclusao = false;
+        String transacaoUser = null;
+        List<String> transacoesUser = Collections.emptyList();
         while (true) {
             System.out.print("Você: ");
             String mensagemUsuario = scanner.nextLine();
@@ -79,80 +94,108 @@ public class GPTChatbot {
             try {
                 String respostaGPT = "Opção 5";
                 try {
-                    respostaGPT = enviarParaGPT(preMessage + "\n" + mensagemUsuario);
+                    String observacao = "\nNão há observações";
+                    if (nome != null) {
+                        observacao = String.format("\n Observação: o nome é %s", nome);
+                    }
+                    respostaGPT = enviarParaGPT(preMessage + "\n" + mensagemUsuario + observacao);
                 } catch (Exception ignored) {
+                    ignored.printStackTrace();
                 }
-                System.out.println("GPT: " + respostaGPT);
+//                System.out.println("GPT: " + respostaGPT);
 
                 int i = Integer.parseInt(respostaGPT.split(" ")[1]);
 
-                if (i == 1) {
-                    if (jaSaudou) {
-                        System.out.println("Entendo sua nescessidade de atenção, porém preciso atuar em agum problema");
-                    } else {
-                        String[] respostas = {"Olá, tudo bem? Como posso ajudar", "Saudações, como posso ajudar?", "Boa tarde, como posso ajudar?"};
-                        System.out.println(respostas[new Random().nextInt(2)]);
-                        jaSaudou = true;
-                    }
-                    continue;
-                }
-                String pretext = jaSaudou ? "" : "Saudações, ";
-                if (i == 2) {
-                    if (nome != null) {
-                        i = 3;
-                    } else {
-                        if (jaPerguntouSobreFraude) {
-                            System.out.println("Entendo sua frustração, porém só posso prosseguir se me passar os dados da transação que acha que é fraudulenta");
+                if (i <= 6) {
+                    if (i == 1) {
+                        if (jaSaudou) {
+                            melhorarMensagem("Entendo sua nescessidade de atenção, porém preciso atuar em agum problema");
                         } else {
-                            String[] pre = {"Que chato ouvir isso, ", "Bom, nesse caso ", ""};
-                            System.out.println(pretext + pre[new Random().nextInt(2)] + "preciso de mais informações sobre, qual seu nome e seu id de transação? caso não saiba pode pesquisar suas transações pelo nome");
+                            String[] respostas = {"Olá, tudo bem? Como posso ajudar", "Saudações, como posso ajudar?", "Boa tarde, como posso ajudar?"};
+                            melhorarMensagem(respostas[new Random().nextInt(2)]);
+                            jaSaudou = true;
                         }
-                        jaPerguntouSobreFraude = true;
                         continue;
                     }
-                }
-                if (nome == null || nome.equals("nome") || nome.equals("null")) {
-                    int nomeInicio = respostaGPT.indexOf("nome:") + 5;
-                    int nomeFim = respostaGPT.indexOf(respostaGPT.contains(",") ? "," : "}", nomeInicio);
-                    nome = respostaGPT.substring(nomeInicio, nomeFim).replace(" ", "");
-                    if (nome.length() > 6 || nome.equals("nome") || nome.equals("null")) {
-                        System.out.println("Por favor informe seu nome" + (i == 4 ? "" : " e o id da transação desejada"));
+                    String pretext = jaSaudou ? "" : "Saudações, ";
+                    if (i == 2) {
+                        if (nome != null) {
+                            i = 3;
+                        } else {
+                            if (jaPerguntouSobreFraude) {
+                                melhorarMensagem("Entendo sua frustração, porém só posso prosseguir se me passar os dados da transação que acha que é fraudulenta");
+                            } else {
+                                String[] pre = {"Que chato ouvir isso, ", "Bom, nesse caso ", ""};
+                                melhorarMensagem(pretext + pre[new Random().nextInt(2)] + "preciso de mais informações sobre, qual seu nome e seu id de transação? caso não saiba pode pesquisar suas transações pelo nome");
+                            }
+                            jaPerguntouSobreFraude = true;
+                            continue;
+                        }
+                    }
+                    if (nome == null || nome.equals("nome") || nome.equals("null")) {
+                        int nomeInicio = respostaGPT.indexOf("nome:") + 5;
+                        int nomeFim = respostaGPT.indexOf(respostaGPT.contains(",") ? "," : "}", nomeInicio);
+                        nome = respostaGPT.substring(nomeInicio, nomeFim).replace(" ", "");
+                        if (nome.length() > 6 || nome.equals("nome") || nome.equals("null")) {
+                            melhorarMensagem("Por favor informe seu nome" + (i == 4 ? "" : " e o id da transação desejada"));
+                            continue;
+                        }
+                    }
+
+                    if (i == 6) {
+                        melhorarMensagem("Obrigado por informar seu nome, irei usar ele nas proximas mensagens");
                         continue;
                     }
+
+                    if (i == 5) {
+                        melhorarMensagem("Não entendi, poderia repetir o questionamento?");
+                        continue;
+                    }
+
+                    int transInicio = respostaGPT.indexOf("trans: ") + 6;
+                    int transFim = respostaGPT.indexOf("}", transInicio);
+                    String transacao = respostaGPT.substring(transInicio + 1, transFim);
+
+
+                    String finalNome = nome;
+                    transacoesUser = transacoes.stream().filter(s -> s.contains(finalNome)).collect(Collectors.toList());
+                    if (i == 3) {
+                        melhorarMensagem("Certo, vou estar analizando sua solicitação");
+                        System.out.println("..............");
+                        System.out.println("..............");
+                        System.out.println("..............");
+                        System.out.println("..............");
+
+
+                        transacaoUser = transacoesUser.stream().filter(s -> s.contains(transacao)).findFirst().orElse(null);
+                        if (transacaoUser != null) {
+                            System.out.printf("Encontrei sua transação \n %s \n\n Gostaria de verificar se é uma transação fraudulenta?%n", transacaoUser);
+                            pedirConfirmacao = true;
+                            continue;
+                        } else {
+                            melhorarMensagem("Não encontrei nenhuma transação por usuario e id de transação");
+                        }
+                    }
+                    if (i == 4) {
+                        melhorarMensagem("Listando transações para o usuario: " + nome);
+                        System.out.println("|Data      |Nome  |Transação id |Valor|");
+                        transacoesUser.forEach(System.out::println);
+                    }
                 }
-
-                if (i == 5) {
-                    System.out.println("Não entendi, poderia repetir o questionamento?");
-                    continue;
-                }
-
-                int transInicio = respostaGPT.indexOf("trans: ") + 6;
-                int transFim = respostaGPT.indexOf("}", transInicio);
-                String transacao = respostaGPT.substring(transInicio + 1, transFim);
-
-
-                String finalNome = nome;
-                List<String> transacoesUser = transações.stream().filter(s -> s.contains(finalNome)).collect(Collectors.toList());
-                if (i == 3) {
-                    System.out.println("Certo, vou estar analizando sua solicitação");
-                    System.out.println("..............");
-                    System.out.println("..............");
-                    System.out.println("..............");
-                    System.out.println("..............");
-
-
-                    String transacaoUser = transacoesUser.stream().filter(s -> s.contains(transacao)).findFirst().orElse(null);
-                    if (transacaoUser != null) {
-                        System.out.println("Encontrei sua transação, vou verificar se possui alguma inconsistencia");
+                if (i == 7) {
+                    if (pedirConfirmacao && transacaoUser != null) {
+                        pedirConfirmacao = false;
+                        melhorarMensagem("Analisando solicitação de fraude");
                         System.out.println("..............");
                         System.out.println("..............");
                         System.out.println("..............");
                         System.out.println("..............");
                         AtomicReference<BigDecimal> valorTransacao = new AtomicReference<>(BigDecimal.ZERO);
+                        String finalTransacaoUser = transacaoUser;
                         BigDecimal mediaAoLongodoTempo = transacoesUser.stream().map(s -> {
                             int ultimoEspaco = s.lastIndexOf('\t');
                             String valor = s.substring(ultimoEspaco + 1);
-                            if (!s.equals(transacaoUser)) {
+                            if (!s.equals(finalTransacaoUser)) {
                                 return new BigDecimal(valor);
                             } else {
                                 valorTransacao.set(new BigDecimal(valor));
@@ -160,32 +203,47 @@ public class GPTChatbot {
                             return BigDecimal.ZERO;
                         }).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                        mediaAoLongodoTempo = mediaAoLongodoTempo.divide(new BigDecimal(transacoesUser.size()));
+                        mediaAoLongodoTempo = mediaAoLongodoTempo.divide(new BigDecimal(transacoesUser.size()), RoundingMode.HALF_UP);
 
                         if (mediaAoLongodoTempo.compareTo(valorTransacao.get()) >= 0) {
-                            System.out.println("Valor da transação não parece com fraude");
+                            melhorarMensagem("Valor da transação não parece com fraude");
                         }
                         BigDecimal diferenca = mediaAoLongodoTempo.subtract(valorTransacao.get()).abs();
                         BigDecimal porcentagem = diferenca.divide(valorTransacao.get(), 10, RoundingMode.HALF_UP)
                                 .multiply(new BigDecimal("100"));
                         if (porcentagem.compareTo(BigDecimal.valueOf(5L)) > 0) {
-                            System.out.println("Valor da transação anormal, medidas cabiveis serão tomadas para o estorno do valor");
-                            System.out.println("..............");
-                            System.out.println("..............");
-                            System.out.println("..............");
-                            System.out.println("..............");
-                            transações.remove(transacaoUser);
-                            System.out.println("Qualquer duvida pode entrar em contato comigo novamente");
-                            jaPerguntouSobreFraude = false;
+                            pedirConfirmacaoExclusao = true;
+                            melhorarMensagem("Valor da transação anormal, gostaria de estornar esse valor?");
                         }
-                    } else {
-                        System.out.println("Não encontrei nenhuma transação por usuario e id de transação");
+                        continue;
                     }
+                    if (pedirConfirmacaoExclusao) {
+                        pedirConfirmacaoExclusao = false;
+                        melhorarMensagem("Realizando estorno da transação");
+                        System.out.println("..............");
+                        System.out.println("..............");
+                        System.out.println("..............");
+                        System.out.println("..............");
+                        transacoes.remove(transacaoUser);
+                        melhorarMensagem("Qualquer duvida pode entrar em contato comigo novamente");
+                        jaPerguntouSobreFraude = false;
+                        continue;
+                    }
+                    melhorarMensagem("Não entendi, poderia repetir?");
+                    jaPerguntouSobreFraude = false;
+                    jaSaudou = false;
+                    pedirConfirmacao = false;
+                    transacaoUser = null;
+                    transacoesUser = Collections.emptyList();
                 }
-                if (i == 4) {
-                    System.out.println("Listando transações para o usuario: " + nome);
-                    System.out.println("|Data      |Nome  |Transação id |Valor|");
-                    transacoesUser.forEach(s -> System.out.println(s));
+                if(i == 8){
+                    melhorarMensagem("Certo, tenha um bom dia!!");
+                    jaPerguntouSobreFraude = false;
+                    jaSaudou = false;
+                    pedirConfirmacao = false;
+                    pedirConfirmacaoExclusao = false;
+                    transacaoUser = null;
+                    transacoesUser = Collections.emptyList();
                 }
 
             } catch (Exception e) {
