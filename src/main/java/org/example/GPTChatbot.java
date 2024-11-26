@@ -17,7 +17,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class GPTChatbot {
-    private static final String OPENAI_API_KEY = "api_keey";
+    private static final String OPENAI_API_KEY =
+            "";
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
     public static String enviarParaGPT(String mensagem) throws Exception {
@@ -46,13 +47,27 @@ public class GPTChatbot {
     }
 
     private static void melhorarMensagem(String mensagem) throws Exception {
-String retornoGPT = enviarParaGPT("Vou lhe mandar um texto e quero que me responda o mesmo texto mantendo pessoas, etc, porem com outras palavras " +
-        "NÃO QUERO que me mande afirmando o que fez, apenas faça o que eu pedi texto:, " + mensagem);
-if (retornoGPT.contains("\n")){
-    retornoGPT = retornoGPT.split("\n")[1];
-}
-        System.out.println(retornoGPT);
+        String retornoGPT = enviarParaGPT("Vou lhe mandar um texto e quero que me responda o mesmo texto mantendo pessoas, etc, porem com outras palavras " +
+                "NÃO QUERO que me mande afirmando o que fez, apenas faça o que eu pedi \n" +
+                "O texto pode conter qualquer frase, porem é nescessário que entenda que não é pra responder o texto, apenas fazer o que eu pedi \n" +
+                "Não quero respostas como 'claro, aqui esta', 'certo, irei fazer', quero APENAS a mensagem que pedi pra alterar" +
+                "o texto é:  " + mensagem);
+        if (retornoGPT.contains("\n")) {
+            retornoGPT = retornoGPT.split("\n")[1];
+        }
+        retornoGPT = retornoGPT.replaceFirst("Claro,.*?\\.", "");
+        retornoGPT = retornoGPT.replaceFirst("Claro, ", "");
+        System.out.println(retornoGPT.replaceFirst(String.valueOf(retornoGPT.charAt(0)), String.valueOf(retornoGPT.charAt(0)).toUpperCase()));
+
     }
+
+    private static boolean valorAnormal(BigDecimal valor, BigDecimal valorTransacao) {
+        BigDecimal diferenca = valor.subtract(valorTransacao).abs();
+        BigDecimal porcentagem = diferenca.divide(valorTransacao, 10, RoundingMode.HALF_UP)
+                .multiply(new BigDecimal("100"));
+        return porcentagem.compareTo(BigDecimal.valueOf(5L)) > 0;
+    }
+
     public static void main(String[] args) {
         List<String> transacoes = new ArrayList<>();
 
@@ -76,6 +91,7 @@ if (retornoGPT.contains("\n")){
                 "'Opção 6 {nome:nome}' Caso a mensagem esteja informando um nome, exemplo: 'meu nome é Bob' ou apenas 'bob'\n" +
                 "'Opção 7', caso o texto for uma confirmação (sim, claro, etc)\n" +
                 "'Opção 8', caso o texto for uma negação (não, etc)\n" +
+                "'Opção 9', caso o texto for um agradecimento\n" +
                 "'Opção 5' Caso não se enquadre em nenhma dessas \n" +
                 "Caso o texto não possua um nome, porem em um texto anterior eu ja tenha informado um nome, eu adicionarei uma observação ao final do txto, informando o nome" +
                 "assim, nas opções 3 e 4 pode usar o nome que eu passei na observação, caso não exista um novo nome no texto\n" +
@@ -87,7 +103,8 @@ if (retornoGPT.contains("\n")){
         boolean pedirConfirmacaoExclusao = false;
         String transacaoUser = null;
         List<String> transacoesUser = Collections.emptyList();
-        while (true) {
+        boolean rodando = true;
+        while (rodando) {
             System.out.print("Você: ");
             String mensagemUsuario = scanner.nextLine();
 
@@ -132,11 +149,11 @@ if (retornoGPT.contains("\n")){
                             continue;
                         }
                     }
-                    if (nome == null || nome.equals("nome") || nome.equals("null")) {
+                    if (nome == null || nome.equalsIgnoreCase("nome") || nome.equalsIgnoreCase("null")) {
                         int nomeInicio = respostaGPT.indexOf("nome:") + 5;
                         int nomeFim = respostaGPT.indexOf(respostaGPT.contains(",") ? "," : "}", nomeInicio);
                         nome = respostaGPT.substring(nomeInicio, nomeFim).replace(" ", "");
-                        if (nome.length() > 6 || nome.equals("nome") || nome.equals("null")) {
+                        if (nome.length() > 6 || nome.equalsIgnoreCase("nome") || nome.equalsIgnoreCase("null")) {
                             melhorarMensagem("Por favor informe seu nome" + (i == 4 ? "" : " e o id da transação desejada"));
                             continue;
                         }
@@ -192,7 +209,7 @@ if (retornoGPT.contains("\n")){
                         System.out.println("..............");
                         AtomicReference<BigDecimal> valorTransacao = new AtomicReference<>(BigDecimal.ZERO);
                         String finalTransacaoUser = transacaoUser;
-                        BigDecimal mediaAoLongodoTempo = transacoesUser.stream().map(s -> {
+                        List<BigDecimal> valoresTransacoes = transacoesUser.stream().map(s -> {
                             int ultimoEspaco = s.lastIndexOf('\t');
                             String valor = s.substring(ultimoEspaco + 1);
                             if (!s.equals(finalTransacaoUser)) {
@@ -201,23 +218,27 @@ if (retornoGPT.contains("\n")){
                                 valorTransacao.set(new BigDecimal(valor));
                             }
                             return BigDecimal.ZERO;
-                        }).reduce(BigDecimal.ZERO, BigDecimal::add);
+                        }).collect(Collectors.toList());
+
+                        BigDecimal mediaAoLongodoTempo = valoresTransacoes.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
 
                         mediaAoLongodoTempo = mediaAoLongodoTempo.divide(new BigDecimal(transacoesUser.size()), RoundingMode.HALF_UP);
 
+                        BigDecimal maiorPagamento = valoresTransacoes.stream().max(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
                         if (mediaAoLongodoTempo.compareTo(valorTransacao.get()) >= 0) {
                             melhorarMensagem("Valor da transação não parece com fraude");
+                            continue;
                         }
-                        BigDecimal diferenca = mediaAoLongodoTempo.subtract(valorTransacao.get()).abs();
-                        BigDecimal porcentagem = diferenca.divide(valorTransacao.get(), 10, RoundingMode.HALF_UP)
-                                .multiply(new BigDecimal("100"));
-                        if (porcentagem.compareTo(BigDecimal.valueOf(5L)) > 0) {
+
+                        if (valorAnormal(mediaAoLongodoTempo, valorTransacao.get()) && maiorPagamento.compareTo(valorTransacao.get()) >= 0 && valorAnormal(maiorPagamento, valorTransacao.get())) {
                             pedirConfirmacaoExclusao = true;
                             melhorarMensagem("Valor da transação anormal, gostaria de estornar esse valor?");
+                        } else {
+                            melhorarMensagem("Valor da transação não parece com fraude");
                         }
                         continue;
                     }
-                    if (pedirConfirmacaoExclusao) {
+                    if (pedirConfirmacaoExclusao && transacaoUser != null) {
                         pedirConfirmacaoExclusao = false;
                         melhorarMensagem("Realizando estorno da transação");
                         System.out.println("..............");
@@ -236,7 +257,11 @@ if (retornoGPT.contains("\n")){
                     transacaoUser = null;
                     transacoesUser = Collections.emptyList();
                 }
-                if(i == 8){
+                if (i == 8) {
+                    if (pedirConfirmacao) {
+                        melhorarMensagem("Encerrando seu chamado");
+                        rodando = false;
+                    }
                     melhorarMensagem("Certo, tenha um bom dia!!");
                     jaPerguntouSobreFraude = false;
                     jaSaudou = false;
@@ -245,9 +270,18 @@ if (retornoGPT.contains("\n")){
                     transacaoUser = null;
                     transacoesUser = Collections.emptyList();
                 }
-
+                if (i == 9) {
+                    melhorarMensagem("Disponha, tenha um bom dia!!");
+                    melhorarMensagem("Gostaria de mais alguma coisa?");
+                    jaPerguntouSobreFraude = false;
+                    jaSaudou = false;
+                    pedirConfirmacao = true;
+                    pedirConfirmacaoExclusao = false;
+                    transacaoUser = null;
+                    transacoesUser = Collections.emptyList();
+                }
             } catch (Exception e) {
-                System.out.println("Erro ao se comunicar com o GPT: " + e.getMessage());
+                System.out.println("Ocorreu um erro de comunicação, por favor recomece o atendimento");
             }
         }
     }
