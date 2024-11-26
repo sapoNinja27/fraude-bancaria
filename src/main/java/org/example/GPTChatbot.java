@@ -119,7 +119,6 @@ public class GPTChatbot {
                 } catch (Exception ignored) {
                     ignored.printStackTrace();
                 }
-//                System.out.println("GPT: " + respostaGPT);
 
                 int i = Integer.parseInt(respostaGPT.split(" ")[1]);
 
@@ -195,8 +194,25 @@ public class GPTChatbot {
                     }
                     if (i == 4) {
                         melhorarMensagem("Listando transações para o usuario: " + nome);
-                        System.out.println("|Data      |Nome  |Transação id |Valor|");
-                        transacoesUser.forEach(System.out::println);
+                        System.out.println("|      Data      |   Nome    |Transação| |Valor|");
+                        transacoesUser.forEach(s -> {
+                            String[] data = s.split("\t");
+                            System.out.print("\t");
+                            System.out.print(data[0]);
+                            System.out.print("\t");
+                            System.out.print("\t");
+                            System.out.print(data[1]);
+                            System.out.print("\t");
+                            System.out.print("\t");
+                            if ("Bob".equalsIgnoreCase(data[1])) {
+                                System.out.print("\t");
+                            }
+                            System.out.print(data[2]);
+                            System.out.print("\t");
+                            System.out.print("\t");
+                            System.out.print(data[3]);
+                            System.out.print("\n");
+                        });
                     }
                 }
                 if (i == 7) {
