@@ -92,7 +92,7 @@ public class GPTChatbot {
                 "'Opção 7', caso o texto for uma confirmação (sim, claro, etc)\n" +
                 "'Opção 8', caso o texto for uma negação (não, etc)\n" +
                 "'Opção 9', caso o texto for um agradecimento\n" +
-                "'Opção 5' Caso não se enquadre em nenhma dessas \n" +
+                "'Opção 5, resposta para o texto' Caso não se enquadre em nenhma dessas, e responda de acordo com a pergunta nesse caso \n" +
                 "Caso o texto não possua um nome, porem em um texto anterior eu ja tenha informado um nome, eu adicionarei uma observação ao final do txto, informando o nome" +
                 "assim, nas opções 3 e 4 pode usar o nome que eu passei na observação, caso não exista um novo nome no texto\n" +
                 "Vou informar o texto agora: ";
@@ -120,9 +120,13 @@ public class GPTChatbot {
                     ignored.printStackTrace();
                 }
 
-                int i = Integer.parseInt(respostaGPT.split(" ")[1]);
+                int i = Integer.parseInt(String.valueOf(respostaGPT.split(" ")[1].charAt(0)));
 
                 if (i <= 6) {
+                    if (i == 5) {
+                        melhorarMensagem(respostaGPT.replace("Opção 5: ", ""));
+                        continue;
+                    }
                     if (i == 1) {
                         if (jaSaudou) {
                             melhorarMensagem("Entendo sua nescessidade de atenção, porém preciso atuar em agum problema");
@@ -152,6 +156,7 @@ public class GPTChatbot {
                         int nomeInicio = respostaGPT.indexOf("nome:") + 5;
                         int nomeFim = respostaGPT.indexOf(respostaGPT.contains(",") ? "," : "}", nomeInicio);
                         nome = respostaGPT.substring(nomeInicio, nomeFim).replace(" ", "");
+                        nome = nome.replace(String.valueOf(nome.charAt(0)), String.valueOf(nome.charAt(0)).toUpperCase());
                         if (nome.length() > 6 || nome.equalsIgnoreCase("nome") || nome.equalsIgnoreCase("null")) {
                             melhorarMensagem("Por favor informe seu nome" + (i == 4 ? "" : " e o id da transação desejada"));
                             continue;
@@ -160,11 +165,6 @@ public class GPTChatbot {
 
                     if (i == 6) {
                         melhorarMensagem("Obrigado por informar seu nome, irei usar ele nas proximas mensagens");
-                        continue;
-                    }
-
-                    if (i == 5) {
-                        melhorarMensagem("Não entendi, poderia repetir o questionamento?");
                         continue;
                     }
 
@@ -193,7 +193,7 @@ public class GPTChatbot {
                         }
                     }
                     if (i == 4) {
-                        melhorarMensagem("Listando transações para o usuario: " + nome);
+                        melhorarMensagem("Listando transações para o usuario: " + nome + "Obs: mantenha o nome igual");
                         System.out.println("|      Data      |   Nome    |Transação| |Valor|");
                         transacoesUser.forEach(s -> {
                             String[] data = s.split("\t");
@@ -246,7 +246,7 @@ public class GPTChatbot {
                             continue;
                         }
 
-                        if (valorAnormal(mediaAoLongodoTempo, valorTransacao.get()) && maiorPagamento.compareTo(valorTransacao.get()) >= 0 && valorAnormal(maiorPagamento, valorTransacao.get())) {
+                        if (valorAnormal(mediaAoLongodoTempo, valorTransacao.get()) && maiorPagamento.compareTo(valorTransacao.get()) <= 0 && valorAnormal(maiorPagamento, valorTransacao.get())) {
                             pedirConfirmacaoExclusao = true;
                             melhorarMensagem("Valor da transação anormal, gostaria de estornar esse valor?");
                         } else {
